@@ -1,0 +1,11 @@
+# Rust build output
+**/target/
+**/*.rs.bk
+
+# IDE junk
+**/.idea/
+**/.vscode/
+
+# Misc noise
+.CACHEDIR.TAG
+.rust-info.json
