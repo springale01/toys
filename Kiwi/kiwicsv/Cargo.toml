@@ -1,0 +1,8 @@
+[package]
+name = "kiwicsv"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+kiwi_utils = { path = "../utils_lib" }
+thiserror = "2.0.17"

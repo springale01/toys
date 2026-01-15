@@ -1,0 +1,7 @@
+[package]
+name = "kiwibank"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+kiwi_utils = { path = "../utils_lib" }
