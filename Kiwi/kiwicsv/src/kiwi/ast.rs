@@ -9,23 +9,28 @@ pub struct KiwiCSV {
     /// Each Cell is a item
     pub content: Vec<Vec<KiwiFruit>>,
     /// Majority of the type in the column
-    pub footer: Vec<KiwiType>,
+    pub footer: Option<Vec<KiwiFruit>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum KiwiType {
     Int(isize),
     Float(KiwiFloat),
     String(String),
     NaN,
-    Error(KiwiError),
     Other { type_info: String, msg: String },
     Unknown,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 /// It combines Kiwitype and KiwiError
 pub enum KiwiFruit {
     Type(KiwiType),
     Error(KiwiError),
+}
+
+#[derive(Debug, Clone)]
+pub struct KiwiSettings {
+    pub header: bool,
+    pub footer: bool,
 }

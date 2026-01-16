@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 pub trait Serialize<'a> {
-    fn serialize(&self) -> Cow<'a, str>;
+    fn serialize(&'_ self) -> Cow<'_, str>;
 }
 
 pub trait Deserialize<'a, T>

@@ -2,10 +2,10 @@ use std::borrow::Cow;
 
 use crate::kiwi::errors::{KiwiError, KiwiResult};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct KiwiTokenizer<'a> {
     /// The Delimiter that would be used for future operations
-    delimiter: &'a str,
+    pub delimiter: &'a str,
     /// Whether to fill in missing values, for example filling something to 7 cells if the most cell is 7
     fill: bool,
     /// Trim or nah
@@ -60,7 +60,7 @@ impl<'a> KiwiTokenizer<'a> {
                 if self.trim {
                     line.trim()
                         .split_terminator(self.delimiter)
-                        .map(|string| Cow::Borrowed(string))
+                        .map(|string| Cow::Borrowed(string.trim()))
                         .collect::<Vec<Cow<'a, str>>>()
                 } else {
                     line.split_terminator(self.delimiter)

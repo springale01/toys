@@ -7,7 +7,7 @@ use crate::kiwi::{
     errors::{KiwiError, KiwiResult},
     inferencer::{PLACES_AFTERDECIMAL, TOTALDIGITS},
     parser::parse,
-    tokenizer::KiwiTokenizer,
+    tokenizer::{self, KiwiTokenizer},
     traits::{Deserialize, Serialize},
 };
 
@@ -29,6 +29,38 @@ impl KiwiCSV {
 
         todo!()
     }
+
+    pub fn pretty_print(&self, tokenizer: KiwiTokenizer) -> String {
+        let header = self.header.join(", ");
+        let body = self
+            .content
+            .iter()
+            .map(|line| {
+                line.iter()
+                    .map(|item| item.to_string())
+                    .collect::<Vec<String>>()
+                    .join(tokenizer.delimiter)
+            })
+            .collect::<Vec<String>>()
+            .join("\n");
+
+        let footer = self.footer.as_ref().map(|footer| {
+            footer
+                .iter()
+                .map(|item| item.to_string())
+                .collect::<Vec<_>>()
+                .join(tokenizer.delimiter)
+        });
+
+        match footer {
+            Some(footer) if !footer.is_empty() => {
+                format!("{}\n{}\n{}", header, body, footer)
+            }
+            _ => {
+                format!("{}\n{}", header, body)
+            }
+        }
+    }
 }
 
 impl std::fmt::Display for KiwiCSV {
@@ -45,16 +77,26 @@ impl std::fmt::Display for KiwiCSV {
             })
             .collect::<Vec<String>>()
             .join("\n");
-        let footer = self
-            .footer
-            .iter()
-            .map(|item| item.to_string())
-            .collect::<Vec<String>>()
-            .join(", ");
 
-        write!(f, "{}\n{}\n{}", header, body, footer)
+        let footer = self.footer.as_ref().map(|footer| {
+            footer
+                .iter()
+                .map(|item| item.to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        });
+
+        match footer {
+            Some(footer) if !footer.is_empty() => {
+                write!(f, "{}\n{}\n{}", header, body, footer)
+            }
+            _ => {
+                write!(f, "{}\n{}", header, body)
+            }
+        }
     }
 }
+
 // ----- KiwiType -----
 
 impl std::fmt::Display for KiwiType {
@@ -62,7 +104,6 @@ impl std::fmt::Display for KiwiType {
         let thing = match self {
             Self::String(x) => format!("[Kiwi::<String>: | {} |]", x),
             Self::Float(x) => format!("[Kiwi::<Float>: | {} |]", x.to_string()),
-            Self::Error(x) => format!("{}", x.to_value()),
             Self::Int(x) => format!("[Kiwi::<Integer>: | {} |]", x),
             Self::NaN => format!("[Kiwi::<NaN>]"),
             Self::Unknown => format!("[Kiwi::<Unknown>]"),
@@ -75,7 +116,7 @@ impl std::fmt::Display for KiwiType {
     }
 }
 impl<'a> Serialize<'a> for KiwiType {
-    fn serialize(&self) -> Cow<'a, str> {
+    fn serialize(&self) -> Cow<'_, str> {
         Cow::Owned(self.to_string())
     }
 }
@@ -114,7 +155,8 @@ impl<'a> Deserialize<'a, KiwiType> for KiwiType {
 
         match type_part {
             "string" => {
-                return Ok(KiwiType::String(value_part));
+                let first_upper = uppercase_first_letter(&value_part);
+                return Ok(KiwiType::String(first_upper));
             }
             "float" => {
                 return Ok(KiwiType::Float({
@@ -128,10 +170,7 @@ impl<'a> Deserialize<'a, KiwiType> for KiwiType {
                     .map_err(|e| KiwiError::KiwiFloatError { msg: e.to_value() })?
                 }));
             }
-            "error" => {
-                let err = KiwiError::deserialize(&value_part)?;
-                return Ok(KiwiType::Error(err));
-            }
+
             "integer" => {
                 return Ok(KiwiType::Int(
                     value_part
@@ -155,6 +194,15 @@ impl<'a> Deserialize<'a, KiwiType> for KiwiType {
     }
 }
 
+fn uppercase_first_letter(string: &str) -> String {
+    let mut charz = string.chars();
+    match charz.next() {
+        Some(c) => {
+            format!("{}{}", c.to_uppercase(), charz.as_str())
+        }
+        None => String::new(),
+    }
+}
 // ----- KiwiFruit -----
 impl std::fmt::Display for KiwiFruit {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -167,30 +215,45 @@ impl std::fmt::Display for KiwiFruit {
     }
 }
 
+impl<'a> Serialize<'a> for KiwiFruit {
+    fn serialize(&'_ self) -> Cow<'_, str> {
+        match self {
+            Self::Type(kiwitype) => kiwitype.serialize(),
+            Self::Error(error) => error.serialize(),
+        }
+    }
+}
+
+impl<'a> Deserialize<'a, KiwiFruit> for KiwiFruit {
+    type Error = KiwiError;
+    fn deserialize(content: &str) -> Result<KiwiFruit, KiwiError> {
+        match KiwiType::deserialize(content) {
+            Ok(v) => return Ok(KiwiFruit::Type(v)),
+            Err(_) => {}
+        }
+
+        match KiwiError::deserialize(content) {
+            Ok(e) => return Ok(KiwiFruit::Error(e)),
+            Err(_) => {}
+        }
+
+        Err(KiwiError::UnknownError)
+    }
+}
+
+// ----- tests -----
 #[cfg(test)]
 mod tests {
     use kiwi_utils::kiwi_float::KiwiFloat;
 
     use super::*;
-
-    #[test]
-    fn test_display() {
-        assert_eq!(
-            KiwiType::String("joe".to_string()).to_string(),
-            "joe".to_string()
-        );
-
-        println!(
-            "{}",
-            KiwiType::Float(KiwiFloat::new(68.684, 100, 30).unwrap())
-        )
-    }
     #[test]
     fn test_deserializatoin() {
         let test_thing = "[Kiwi::<Integer>: | 74 |]";
+        let out = KiwiType::deserialize(test_thing).expect("failed to deserialize type!");
 
-        let out = KiwiType::deserialize(test_thing).unwrap_or(KiwiType::NaN);
+        assert_eq!(test_thing, KiwiType::Int(74).to_string());
 
-        println!("{}", out)
+        println!("{out}")
     }
 }

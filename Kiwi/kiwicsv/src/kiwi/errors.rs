@@ -2,9 +2,9 @@ use std::borrow::Cow;
 
 use thiserror::Error;
 
-use crate::kiwi::traits::Deserialize;
+use crate::kiwi::traits::{Deserialize, Serialize};
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq)]
 pub enum KiwiError {
     // ----- Difference Errors -----
     #[error("Different Than Expected Type")]
@@ -101,5 +101,11 @@ impl<'a> Deserialize<'a, KiwiError> for KiwiError {
 
             _ => Err(KiwiError::IncorrectFormat),
         }
+    }
+}
+
+impl<'a> Serialize<'a> for KiwiError {
+    fn serialize(&self) -> Cow<'_, str> {
+        self.to_value()
     }
 }
